@@ -1,0 +1,115 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/* ===== plugins.css =====================================================
+   == Styles used by the about:plugins page.
+   ======================================================================= */
+
+html {
+  background: -moz-Dialog;
+}
+
+body {
+  color: -moz-FieldText;
+  font: message-box;
+  position: relative;
+  min-width: 330px;
+  max-width: 80%;
+  margin: 4em auto;
+  border: 2px solid #dadada;
+  -moz-border-radius: 15px;
+  padding: 3em;
+  -moz-padding-start: 30px;
+  background: -moz-Field;
+  -moz-box-shadow: -4px 4px 8px rgba(0,0,0,0.12), 4px 4px 8px rgba(0,0,0,0.12);
+}
+
+h1 {
+  margin: 0 0 .6em 0;
+  font-size: 240%;
+  color: #0141b7;
+  font-weight: normal;
+  text-align: left;
+  border-bottom: 1px solid ThreeDLightShadow;
+  padding-bottom: .2em;
+}
+
+hr {
+  margin: 1.5em 0;
+  border: none;
+  border-top: 1px solid #333;
+}
+
+#findmore {
+  margin-top: 2em;
+}
+
+.plugname {
+  margin-top: 2em;
+  margin-bottom: 1em;
+  font-size: 200%;
+  text-align: start;
+  font-weight: bold;
+}
+
+dl {
+  margin: 0 0 1em 0;
+}
+
+dd {
+  -moz-margin-start: 0;
+}
+
+dd:first-child + dd {
+  margin-bottom: 0.5em;
+}
+
+table {
+  background-color: -moz-Field;
+  color: -moz-DialogText;
+  font: message-box;
+  text-align: start;
+  width: 100%;
+  margin: 0;
+  border: 1px solid #666;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+th, td {
+  border: none;
+  padding: 3px;
+}
+
+th {
+  text-align: center;
+  background-color: -moz-mac-secondaryhighlight;
+  color: -moz-DialogText;
+}
+
+th + th,
+td + td {
+  -moz-border-start: 1px solid #bbb;
+}
+
+td {
+  text-align: start;
+  word-wrap: break-word;
+}
+
+tbody > tr:nth-child(even) {
+  background: -moz-Dialog;
+}
+
+th.type, th.desc {
+  width: 25%;
+}
+
+th.suff {
+  width: 40%;
+}
+
+th.enabled {
+  width: 10%;
+}

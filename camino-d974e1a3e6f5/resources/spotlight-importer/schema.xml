@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+
+<schema version="1.0" xmlns="http://www.apple.com/metadata"
+                      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                      xsi:schemaLocation="http://www.apple.com/metadata file:///System/Library/Frameworks/CoreServices.framework/Frameworks/Metadata.framework/Resources/MetadataSchema.xsd">
+
+    <types>
+      <type name="org.mozilla.camino.bookmark">
+            <allattrs>
+            kMDItemDisplayName kMDItemTitle kMDItemURL kMDItemDescription kMDItemKeywords kMDItemContentModificationDate
+            </allattrs>
+            <displayattrs>
+            kMDItemTitle kMDItemURL kMDItemDescription
+            </displayattrs>
+        </type>
+    </types>
+</schema>
+

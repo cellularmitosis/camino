@@ -1,0 +1,14 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this file,
+ * You can obtain one at http://mozilla.org/MPL/2.0/. */
+/* Localized versions of Info.plist keys */
+
+/* The BreakpadVendor string appears in the Crash Reporter.  It is an indirect 
+   object in a sentence informing users that a crash report has been generated
+   that users can send "to the Camino developers" to help us figure out the
+   crash. */
+BreakpadVendor = "the Camino developers";
+CFBundleName = "Camino";
+CFBundleShortVersionString = "%CM_APP_VERSION%";
+CFBundleGetInfoString = "Camino %CM_APP_VERSION%, © 1998-%CM_COPYRIGHT_YEAR% Contributors";
+NSHumanReadableCopyright = "© 1998-%CM_COPYRIGHT_YEAR% Contributors";

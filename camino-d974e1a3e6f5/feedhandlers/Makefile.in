@@ -1,0 +1,81 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+DEPTH		= ../..
+topsrcdir	= @top_srcdir@
+srcdir		= @srcdir@
+VPATH		= @srcdir@
+
+include $(DEPTH)/config/autoconf.mk
+
+DEREZ = /Developer/Tools/DeRez
+REZ   = /Developer/Tools/Rez
+
+FEED_HANDLERS = \
+	GoogleFeedHandler \
+	MyYahooFeedHandler \
+	$(NULL)
+
+GENERATED_DIR = ../generated/feedhandlers
+
+GARBAGE += \
+	$(patsubst %, %.r, $(FEED_HANDLERS)) \
+	$(patsubst %, %.applescript, $(FEED_HANDLERS)) \
+	$(NULL)
+
+GARBAGE_DIRS += $(GENERATED_DIR)
+
+GENERATED_FEED_HANDLERS = $(patsubst %, $(GENERATED_DIR)/%.app,$(FEED_HANDLERS))
+
+SCRIPT_FILE = $(srcdir)/feedhandlers.applescript.in
+INFOPLIST_FILE = $(srcdir)/Info.plist.in
+INFOPLISTSTRINGS_FILE = $(srcdir)/InfoPlist.strings.in
+
+CM_COPYRIGHT_YEAR_FILE = $(srcdir)/../config/year.txt
+CM_COPYRIGHT_YEAR := $(shell cat $(CM_COPYRIGHT_YEAR_FILE))
+
+include $(topsrcdir)/config/rules.mk
+
+$(GENERATED_FEED_HANDLERS): \
+  $(GENERATED_DIR)/%.app: $(srcdir)/%.txt $(srcdir)/%.icns \
+  $(SCRIPT_FILE) \
+  $(INFOPLIST_FILE) \
+  $(INFOPLISTSTRINGS_FILE) \
+  $(CM_COPYRIGHT_YEAR_FILE)
+	mkdir -p $(dir $@)
+	@set -e ; \
+	APP=$@ ; \
+	UTF16_SCRIPT_FILE=$*.applescript ; \
+	R_FILE=$*.r ; \
+	CFBUNDLE_NAME=$* ; \
+	INFO_TXT=$< ; \
+	ICNS_FILE=$(srcdir)/$*.icns ; \
+	URL=$$(cat "$$INFO_TXT" | head -1) ; \
+	CREATOR=$$(cat "$$INFO_TXT" | tail +2 | head -1) ; \
+	DISPLAY_NAME=$$(cat "$$INFO_TXT" | tail +3 | head -1) ; \
+	set -x ; \
+	rm -rf $$APP ; \
+	sed -e "s@%FEED_HANDLER_URL%@$$URL@" $(SCRIPT_FILE) | \
+	  iconv -f UTF-8 -t UTF-16 > $$UTF16_SCRIPT_FILE ; \
+	osacompile -a $(OS_TEST) -x -o $$APP $$UTF16_SCRIPT_FILE ; \
+	$(DEREZ) $$APP/Contents/Resources/applet.rsrc -useDF > \
+	  $$R_FILE ; \
+	$(REZ) $$R_FILE -o \
+	  $$APP/Contents/Resources/applet.rsrc -useDF ; \
+	cp $$ICNS_FILE $$APP/Contents/Resources/applet.icns ; \
+	printf APPL$$CREATOR > $$APP/Contents/PkgInfo ; \
+	sed -e "s/%FEED_HANDLER_CFBUNDLE_NAME%/$$CFBUNDLE_NAME/" \
+	    -e "s/%FEED_HANDLER_DISPLAY_NAME%/$$DISPLAY_NAME/" \
+	    -e "s/%FEED_HANDLER_CREATOR%/$$CREATOR/" \
+	    -e "s/%CM_COPYRIGHT_YEAR%/$(CM_COPYRIGHT_YEAR)/" \
+	    $(INFOPLIST_FILE) > \
+	    $$APP/Contents/Info.plist ; \
+	mkdir -p $$APP/Contents/Resources/English.lproj ; \
+	sed -e "s/%FEED_HANDLER_DISPLAY_NAME%/$$DISPLAY_NAME/" \
+	    -e "s/%CM_COPYRIGHT_YEAR%/$(CM_COPYRIGHT_YEAR)/" \
+	    $(INFOPLISTSTRINGS_FILE) | \
+	  iconv -f UTF-8 -t UTF-16 > \
+	  $$APP/Contents/Resources/English.lproj/InfoPlist.strings
+
+libs:: $(GENERATED_FEED_HANDLERS)

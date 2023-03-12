@@ -1,0 +1,16 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+# Override Gecko .dtd and stubborn .properties files with localized versions
+# DTD
+override chrome://global/locale/config.dtd           config.dtd
+override chrome://global/locale/global.dtd           global.dtd
+override chrome://global/locale/mozilla.dtd          mozilla.dtd
+override chrome://global/locale/netError.dtd         netError.dtd
+override chrome://global/locale/xml/prettyprint.dtd  prettyprint.dtd
+override chrome://mozapps/locale/plugins/plugins.dtd plugins.dtd
+
+# Properties
+override chrome://global/locale/typeaheadfind.properties typeaheadfind.properties
+override chrome://global/locale/security/caps.properties caps.properties

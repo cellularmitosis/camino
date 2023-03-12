@@ -1,0 +1,85 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+/* Replaces mozilla/themes/classic/global/config.css to add Camino-like styles 
+   for the about:config warning screen (see bug 355080) */
+
+/* ===== config.css ==============================================
+   == Styles for about:config
+   ======================================================================= */
+
+@import url("chrome://global/skin/");
+@namespace url("http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul");
+
+/* ::::: warning screen ::::: */
+
+#warningScreen
+{
+  background-color: -moz-Dialog;
+}
+
+#warningBox
+{
+  background-color: -moz-Field;
+  color: -moz-FieldText;
+  border: 1px solid ThreeDShadow;
+  -moz-border-radius: 10px;
+  padding: 3em;
+  -moz-padding-start: 25px;
+  margin-left: 1em;
+  margin-right: 1em;
+  -moz-box-shadow: -4px 4px 8px rgba(0,0,0,0.12), 4px 4px 8px rgba(0,0,0,0.12);
+}
+
+#warningInnerBox
+{
+ max-width: 50em;
+}
+
+#warningTitle
+{
+  margin: 0.6em 0;
+  font-size: 200%;
+  padding-bottom: 0.6em;
+  border-bottom: 1px solid ThreeDLightShadow;
+  color: #0141b7;
+}
+
+#warningText
+{
+  font-size: 110%;
+  margin-left: 0;
+}
+
+#warningButton
+{
+  margin-top: 0.6em;
+}
+
+#showWarningNextTime
+{
+  margin-top: 0.6em;
+}
+
+#exclam
+{
+  list-style-image: none;
+  margin-right: 2em;
+   background: url("chrome://global/skin/icons/warning.png") no-repeat 0 0;
+   -moz-background-size: 100px 100px;
+   width:100px;
+   height:100px;
+}
+
+/* ::::: tree rows ::::: */
+
+treechildren::-moz-tree-cell-text(user)
+{
+  font-weight: bold;
+}
+
+treechildren::-moz-tree-cell-text(locked)
+{
+  font-style: italic;
+}

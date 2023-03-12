@@ -1,0 +1,18 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+/**
+ * Bridge interface for calling into JS-only components.
+ */
+
+[scriptable, uuid(d2364e73-56e8-4e69-95e9-64ac83b83e25)]
+interface chIJavascriptBridge : nsISupports
+{
+  /**
+   * Kicks off routine maintenance tasks, such as PlacesDB cleanup.
+   */
+  void startMaintenance();
+};

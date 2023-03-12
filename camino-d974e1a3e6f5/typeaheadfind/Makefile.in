@@ -1,0 +1,66 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+DEPTH = ../..
+topsrcdir = @top_srcdir@
+srcdir = @srcdir@
+VPATH = @srcdir@
+
+include $(DEPTH)/config/autoconf.mk
+
+MODULE = suitetypeaheadfind
+LIBRARY_NAME = suitetypeaheadfind
+XPIDL_MODULE=suitetypeaheadfind
+GRE_MODULE	= 1
+MOZILLA_INTERNAL_API = 1
+
+REQUIRES = \
+	appcomps \
+	embedcomponents \
+	content \
+	docshell \
+	dom \
+	find \
+	intl \
+	gfx \
+	thebes \
+	layout \
+	locale \
+	necko \
+	pref \
+	string \
+	unicharutil \
+	uriloader \
+	view \
+	webshell \
+	widget \
+	webbrwsr \
+	windowwatcher \
+	xpcom \
+	xuldoc \
+	$(NULL)
+
+EXPORT_LIBRARY = 1
+IS_COMPONENT = 1
+MODULE_NAME	= nsTypeAheadFind
+
+CPPSRCS = \
+	nsTypeAheadFind.cpp \
+	nsTypeAheadFindRegistration.cpp \
+	$(NULL)
+
+EXTRA_DSO_LIBS = \
+    gkgfx \
+    $(NULL)
+
+EXTRA_DSO_LDOPTS += \
+	$(LIBS_DIR) \
+	$(MOZ_UNICHARUTIL_LIBS) \
+	$(EXTRA_DSO_LIBS) \
+	$(MOZ_COMPONENT_LIBS) \
+	$(NULL)
+
+XPIDLSRCS = nsITypeAheadFind.idl
+
+include $(topsrcdir)/config/rules.mk

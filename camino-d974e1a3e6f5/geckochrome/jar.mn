@@ -1,0 +1,54 @@
+# These really should be override directives instead of replacements, but we don't have camino.jar,
+# and registering new chrome packages for each jar in order to have the override directives use the
+# new chrome packages seems silly when replacing things is so much simpler. 
+
+toolkit.jar:
+# Replace the generic Toolkit license and crashes.xhtml with ones appropriate for Camino
+*  content/global/license.html                             (/toolkit/content/license.html)
++  content/global/crashes.xhtml                            (content/global/crashes.xhtml)
+# Work around bug 552596 to un-break integer prefs in about:config; this can be removed in Gecko 2.
+*+ content/global/config.js                                (content/global/config.js)
+# The default CSS for about:plugins is in content; override it to make sure nothing bleeds through.
++  content/global/plugins.css                              (content/global/plugins.css)
+# Uh, yeah.  In Gecko 2, this can move to classic.jar, though; see bug 520364.
++  content/global/aboutMemory.css                          (skin/classic/global/aboutMemory.css)
+# Stop shipping the useless comm.jar.  This can be removed in Gecko 2, which does the same thing.
+%  content xbl-marquee %content/xbl-marquee/ xpcnativewrappers=yes
+   content/xbl-marquee/xbl-marquee.xml                     (/layout/style/xbl-marquee/xbl-marquee.xml)
+   content/xbl-marquee/xbl-marquee.css                     (/layout/style/xbl-marquee/xbl-marquee.css)
+# Plug-ins UI
+# In Gecko 2, the CSS and image files change names and locations; see
+# http://mxr.mozilla.org/mozilla1.9.2/source/toolkit/themes/pinstripe/mozapps/plugins/pluginProblem.css
++  content/mozapps/plugins/pluginProblem.xml               (content/mozapps/plugins/pluginProblem.xml)
++  content/mozapps/plugins/pluginProblemContent.css        (content/mozapps/plugins/pluginProblemContent.css)
++  content/mozapps/plugins/pluginProblemLorentz.css        (content/mozapps/plugins/pluginProblemLorentz.css)
++  content/mozapps/plugins/pluginBlocked.png               (content/mozapps/plugins/pluginBlocked.png)
++  content/mozapps/plugins/pluginDisabled.png              (content/mozapps/plugins/pluginDisabled.png)
++  content/mozapps/plugins/pluginDownload.png              (content/mozapps/plugins/pluginDownload.png)
+
+classic.jar:
+# Override Firefox-styled theme files with those appropriate for Camino
++  skin/classic/global/about.css                           (skin/classic/global/about.css)
++  skin/classic/global/config.css                          (skin/classic/global/config.css)
++  skin/classic/global/netError.css                        (skin/classic/global/netError.css)
++  skin/classic/global/dirListing/dirListing.css           (skin/classic/global/dirListing/dirListing.css)
++  skin/classic/global/dirListing/folder.png               (skin/classic/global/dirListing/folder.png)
++  skin/classic/global/dirListing/local.png                (skin/classic/global/dirListing/folder.png)
++  skin/classic/global/dirListing/remote.png               (skin/classic/global/dirListing/remote.png)
++  skin/classic/global/dirListing/symlink.png              (skin/classic/global/dirListing/symlink.png)
++  skin/classic/global/dirListing/up.png                   (skin/classic/global/dirListing/up.png)
++  skin/classic/global/icons/blacklist.png                 (skin/classic/global/icons/blacklist.png)
++  skin/classic/global/icons/warning.png                   (skin/classic/global/icons/warning.png)
+
+en-US.jar:
+# Replace generic files with ones appropriate for Camino
++  locale/en-US/global/config.dtd                          (locale/en-US/global/config.dtd)
++  locale/en-US/global/netError.dtd                        (locale/en-US/global/netError.dtd)
+# Find-As-You-Type
++  locale/en-US/global/typeaheadfind.properties            (locale/en-US/global/typeaheadfind.properties)
+# Branding
+%  locale branding en-US %locale/branding/
+   locale/branding/brand.dtd                               (locale/branding/brand.dtd)
+*  locale/branding/brand.properties                        (locale/branding/brand.properties)
+# Plug-ins UI
++  locale/en-US/mozapps/plugins/plugins.dtd                (locale/en-US/mozapps/plugins/plugins.dtd)

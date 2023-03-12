@@ -1,0 +1,55 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+#include "domstubs.idl"
+#include "nsISupportsPrimitives.idl"
+
+%{ C++
+  #include "nsIDOMEvent.h"
+
+  #define NS_TYPEAHEADFIND_CID \
+    {0x46590685, 0xbc00, 0x4aac, {0xab, 0xed, 0x2c, 0x10, 0xa5, 0xb9, 0x45, 0xa4}}
+
+  #define NS_TYPEAHEADFIND_CONTRACTID "@mozilla.org/suitetypeaheadfind;1"
+%}
+
+interface nsIDOMEvent;
+
+[scriptable, uuid(AD1C62CC-72F4-4c5b-BE78-503854F9E0D8)]
+interface nsISuiteTypeAheadFind : nsISupports
+{
+  /** Is type ahead find mode currently on? */
+  readonly attribute boolean isActive;
+
+  /** Manually start type ahead find mode */
+  void startNewFind(in nsIDOMWindow aWindow, in boolean aLinksOnly);
+
+  /** Manually cancel type ahead find mode */
+  void cancelFind();
+
+  /**
+    * Will find as you type start automatically if the user
+    * types with the focus on page content other than a textfield or select?
+    * If autostart is off, the startNewFind() method can be used to enact
+    * type ahead find, as well as cmd_findTypeLinks or cmd_findTypeText.
+    */
+  void setAutoStart(in nsIDOMWindow aWindow, in boolean aIsAutoStartOn);
+  boolean getAutoStart(in nsIDOMWindow aWindow);  
+
+  /**
+    * Find next recurrence if typeaheadfind was the last used find, 
+    * as opposed to regular find. Returns false in nsISupportsPRBool if we
+    * don't handle the request.
+    */
+  void findNext(in boolean aReverse, in nsISupportsInterfacePointer aCallerWindowSupports);
+
+  /*
+   * Go back and remove one character from find string
+   * Returns true if backspace used
+   */
+  boolean backOneChar();
+};
+

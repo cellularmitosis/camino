@@ -1,0 +1,116 @@
+(* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. *)
+
+(*
+Indirectly reference Camino to prevent osacompile on the tinderbox from
+including paths to different copies of Camino per-arch in the compiled 
+main.scpt, since this breaks unify.
+*)
+
+property caminoApp : "Camino"
+property feedProtocols : {"feed"}
+property httpProtocols : {"http", "https"}
+
+on open location inURL
+
+	(*
+	Encode any common non-alpha characters in URLs--except colon (:), which is
+	handled below--to improve compatibility with URL parsers of major web feed
+	readers on edge-case feeds like Bugzilla bug lists and MediaWiki "Recent
+	Changes" pages.  Double-encode any existing percent signs (%) because
+	Firefox does this to make the iGoogle URL parser happy.
+	*)
+
+	set theTIDs to AppleScript's text item delimiters
+	set AppleScript's text item delimiters to "%"
+	set theUnencodedItems to text items of inURL
+	set AppleScript's text item delimiters to "%25"
+	set partiallyEncodedURI to (text items 1 through end of theUnencodedItems) ¬
+		as string
+	set AppleScript's text item delimiters to "&"
+	set theUnencodedItems to text items of partiallyEncodedURI
+	set AppleScript's text item delimiters to "%26"
+	set partiallyEncodedURI to (text items 1 through end of theUnencodedItems) ¬
+		as string
+	set AppleScript's text item delimiters to "="
+	set theUnencodedItems to text items of partiallyEncodedURI
+	set AppleScript's text item delimiters to "%3D"
+	set partiallyEncodedURI to (text items 1 through end of theUnencodedItems) ¬
+		as string
+	set AppleScript's text item delimiters to "?"
+	set theUnencodedItems to text items of partiallyEncodedURI
+	set AppleScript's text item delimiters to "%3F"
+	set partiallyEncodedURI to (text items 1 through end of theUnencodedItems) ¬
+		as string
+	set AppleScript's text item delimiters to "/"
+	set theUnencodedItems to text items of partiallyEncodedURI
+	set AppleScript's text item delimiters to "%2F"
+	set partiallyEncodedURI to (text items 1 through end of theUnencodedItems) ¬
+		as string
+	set AppleScript's text item delimiters to theTIDs
+
+	(*
+	We're going to split the inURL string on colons (:) and append non-"feed"
+	fragments to build the full URL we send to the handler.  We do this because
+	we can get feed urls in	the following five formats
+	feed:http://
+	feed:https://
+	feed://
+	feed:feed://
+	feed:feed:http://
+	and because some feeds have unescaped colons (:) in the URL string, e.g. 
+	http://wiki.caminobrowser.org/index.php?title=Special:Recentchanges&feed=atom
+	*)
+
+	set theTIDs to AppleScript's text item delimiters
+	set AppleScript's text item delimiters to ":"
+	set theItems to text items of partiallyEncodedURI
+	set AppleScript's text item delimiters to "%3A"
+
+	(* 
+	If the first text item is feed, get rid of it.  If the second item is also
+	feed, get rid of it.  Then, if the third text item is http or https, take
+	it and the whole rest of the string (it's a valid url).  Otherwise, append 
+	http in front of the third item.
+
+	If the second text item is http or https, take it and the whole rest of the
+	string (it's a valid url).  Else ( //server.tld/url ) append http to the 
+	rest of the string.  This works fine as long as we're never handed URIs in
+	the format feed://http://server.tld/url or feed://https://server.tld/url.
+	Restore the TIDs when we're done constructing the URL we'll send back to 
+	Camino.
+	*)
+
+	if the first text item of theItems is in feedProtocols then
+		if the second text item of theItems is in feedProtocols then
+			if the third text item of theItems is in httpProtocols then
+				set feedURLasHTTP to (text items 3 through end of theItems) ¬
+					as string
+			else
+				set feedURLasHTTP to ("http%3A" & text items 3 through ¬
+					end of theItems) as string
+			end if
+		else
+			if the second text item of theItems is in httpProtocols then
+				set feedURLasHTTP to (text items 2 through end of theItems) ¬
+					as string
+			else
+				set feedURLasHTTP to ("http%3A" & text items 2 through ¬
+					end of theItems) as string
+			end if
+		end if
+	end if
+
+	set AppleScript's text item delimiters to theTIDs
+
+	my passFeedtoHandlerURL(feedURLasHTTP)
+end open location
+
+on passFeedtoHandlerURL(feedURLasHTTP)
+	set feedHandler to "%FEED_HANDLER_URL%"
+	tell application caminoApp -- in case Camino isn't set as the default browser
+		activate -- don't stay in the background when the sender was another app
+		open location feedHandler & feedURLasHTTP
+	end tell
+end passFeedtoHandlerURL

@@ -1,0 +1,562 @@
+#!/usr/bin/ruby -w
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+require 'date'
+require 'set'
+
+# IP addresses to filter out of the logs. For readability, these are
+# string/regex hybrids. The first three octets should just be numbers, and the
+# octet separators will be escaped automatically. The last octet will be
+# treated as a regex (or if blank, as .*).
+$bad_ips = [
+  '24.247.144.176',
+  '24.247.222.5',
+  '50.105.93.108',
+  '50.33.236.131',
+  '63.245.210.43',
+  '64.20.198.241',
+  '68.41.5.207',
+  '68.60.62.218',
+  '68.61.64.152',
+  '68.61.212.146',
+  '69.58.60.2',
+  '72.10.105.23',
+  '75.5.224.120',
+  '75.40.251.127',
+  '75.135.19.219',
+  '76.235.172.66',
+  '76.235.215.146',
+  '97.83.19.95',
+  '97.119.20.170',
+  '97.119.24.98',
+  '98.209.69.10',
+  '99.25.154.14',
+  '99.74.226.232',
+  '99.109.127.172',
+  '99.112.212.136',
+  '99.112.213.189',
+  '99.119.128.39',
+  '99.119.129.81',
+  '99.181.133.31',
+  '99.181.137.195',
+  '99.181.141.88',
+  '99.181.142.90',
+  '99.181.145.135',
+  '99.181.148.6',
+  '99.181.149.199',
+  '99.181.152.205',
+  '99.181.153.236',
+  '99.181.155.33',
+  '99.181.157.157',
+  '108.73.115.128',
+  '108.195.136.31',
+  '108.239.105.145',
+  '149.150.236.189',
+  '149.150.236.250',
+  '189.108.14.138',
+  '200.19.92.',
+  '203.42.177.1[6-9]',
+  '204.234.25.253',
+  '204.234.28.',
+  '205.202.243.2[3-9]',
+  '205.202.243.3.',
+  '205.202.243.4[0-7]',
+  '216.176.16.120',
+]
+
+# Keys for the various printed sections. These are listed explicitly, rather
+# than generated dynamically from the data, in order to match the spreadsheet.
+$by_arch_keys = ['x86', 'ppc']
+$by_os_keys = ['10.8', '10.7', '10.6', '10.5', '10.4', '10.3']
+$by_major_version_keys = ['2.1', '2.0', '1.6']
+$by_version_keys = [
+  '2.1.2', '2.1.1', '2.1',
+  '2.1b2', '2.1b1', '2.1a1',
+  '2.0.9', '2.0.8', '2.0.7', '2.0.6', '2.0.5', '2.0.4', '2.0.3', '2.0.2',
+  '2.0.1', '2.0',
+  '2.0b4', '2.0b3', '2.0b2', '2.0b1', '2.0a1',
+  '1.6.11', '1.6.10', '1.6.9', '1.6.8', '1.6.7', '1.6.6', '1.6.5', '1.6.4',
+  '1.6.3', '1.6.2', '1.6.1', '1.6',
+]
+$os_keys_for_version = {
+  '2.1' => $by_os_keys[0..-2],
+  '2.0' => $by_os_keys[0..-2],
+  '1.6' => $by_os_keys,
+}
+$by_language_keys = [
+  # Official languages
+  'da', 'de', 'en', 'es', 'fr', 'it', 'ja', 'nb', 'nl', 'pl', 'ru', 'sl', 'sv',
+  'tr_TR', 'zh_CN',
+  # Other languages that have shown up in pings
+  'en-GB', 'ko', 'fi', 'zh_TW',
+]
+# The major version to print language counts for
+$language_count_version = "2.1"
+
+# The major version of the current release
+$latest_major_version = "2.1"
+
+def main
+  print_usage if ARGV.length < 1
+  command = ARGV.shift
+  if (command == 'counts')
+    handle_command_counts(ARGV)
+  elsif (command == 'percents')
+    handle_command_percents(ARGV)
+  elsif (command == 'pretty-print')
+    handle_command_pretty_print(ARGV)
+  elsif (command == 'dump-ips')
+    handle_command_dump_ips(ARGV)
+  else
+    print_usage
+  end
+end
+
+# Print usage info and then exit
+def print_usage
+  program = File.basename($0)
+  puts <<EOF
+Usage:"
+  #{program} counts <date>[,<date>] <caminobrowser.org-ssl_log path>
+        [ <caminobrowser.org-ssl_log path> ...]
+  #{program} percents <date>[,<date>] <caminobrowser.org-ssl_log path>
+        [ <caminobrowser.org-ssl_log path> ...]
+    Generates ping data to paste into the appropriate sheet of the tracking
+    spreadsheet. If given one date, data is generated for only that date; if
+    two, data is generated for all dates in that range (inclusive).
+
+  #{program} pretty-print <date> <caminobrowser.org-ssl_log path>
+        [ <caminobrowser.org-ssl_log path> ...]
+    Generates a human-readable overview of the ping breakdown for the given
+    date.
+
+  #{program} dump-ips <threshold> <caminobrowser.org-ssl_log path>
+        [ <caminobrowser.org-ssl_log path> ...]
+    Lists all IPs that aren't already blacklisted and have more than |threshold|
+    pings in a day, in descending order of the max number of pings, along with
+    the ping counts for each day in the log files.
+EOF
+  exit
+end
+
+# Handle the top-level 'counts' command.
+def handle_command_counts(arguments)
+  load_and_process_by_date(arguments[1..-1], arguments[0]) {|date, pings|
+    print_spreadsheet_count_line(date, pings)
+  }
+end
+
+# Handle the top-level 'percents' command.
+def handle_command_percents(arguments)
+  load_and_process_by_date(arguments[1..-1], arguments[0]) {|date, pings|
+    print_spreadsheet_percent_line(date, pings)
+  }
+end
+
+# Shared implementation for commands that take a date specifier and file list
+# and process the pings by day.
+def load_and_process_by_date(files, date_spec, &block)
+  print_usage unless date_spec and !files.empty?
+
+  date_range = date_range_for_argument(date_spec)
+  pings_by_date = load_filtered_pings_by_date(files)
+
+  date_range.each do |date|
+    block.call(date, pings_by_date[date.date_str])
+  end
+end
+
+# Handle the top-level 'pretty-print' command.
+def handle_command_pretty_print(arguments)
+  print_usage if arguments.length < 2
+
+  date = Date.parse(arguments.shift)
+
+  pings_by_date = load_filtered_pings_by_date(arguments)
+
+  print_overview_tables(pings_by_date[date.date_str])
+end
+
+# Handle the top-level 'dump-ips' command.
+def handle_command_dump_ips(arguments)
+  print_usage if arguments.length < 2
+  threshold = Integer(arguments.shift)
+  pings = load_filtered_pings(arguments)
+  counts = count_pings_by_attribute_pair(pings, :ip, :date_str)
+
+  dates = Set.new
+  counts.values.each do |date_hash|
+    dates.merge(date_hash.keys)
+  end
+  dates = dates.map {|date_str| Date.parse(date_str) }.sort
+  label_width = 15
+  print_table_row(nil, label_width, dates.map {|date| date.strftime("%m/%d") })
+
+  counts.keys.sort_by {|ip| counts[ip].values.max }.reverse.each do |ip|
+    daily_pings = counts[ip]
+    break if counts[ip].values.max < threshold
+    print_table_row(ip, label_width,
+                    dates.map {|date| daily_pings[date.date_str] || 0 })
+  end
+end
+
+# Given a hash of counts, prints a list of percentages.
+def print_percentage_list(counts)
+  total = counts.values.sum
+  labels = counts.keys.sort
+  label_width = labels.map {|key| key.length}.max
+  labels.each do |key|
+    percent = short_percent(counts[key], total)
+    print_table_row(key, label_width, percent)
+  end
+end
+
+# Given a two-dimensional hash of counts, prints a table of percentages.
+def print_percentage_table(counts)
+  total = counts.values.inject(0) {|sum, row| sum + row.values.sum }
+  row_keys = counts.keys.sort
+  column_keys = column_keys_for_breakdown(counts)
+  label_width = row_keys.map {|key| key.length}.max
+  print_table_row(nil, label_width, column_keys)
+  row_keys.each do |row_key|
+    row = counts[row_key]
+    percents = column_keys.map {|key| short_percent(row[key], total) }
+    percents.push("| " + short_percent(row.values.sum, total).rjust(4))
+    print_table_row(row_key, label_width, percents)
+  end
+  column_sums = column_keys.collect {|key| column_sum(counts, key) }
+  print_table_row(nil, label_width,
+                  column_sums.map {|sum| short_percent(sum, total) })
+end
+
+# Prints one line of a table.
+def print_table_row(row_label, label_width, cells)
+  print row_label ? (row_label.rjust(label_width) + " |") :
+                    (" " * (label_width + 2))
+  cells.each {|cell| print cell.to_s.rjust(7) }
+  print "\n"
+end
+
+# Given a two-dimensional hash, returns a sorted column label list.
+# TODO: take a sorting block.
+def column_keys_for_breakdown(hash)
+  columns = Set.new
+  hash.values.each {|row| columns.merge(row.keys) }
+  return columns.to_a.sort
+end
+
+# Given a two-dimensional hash of numbers, returns the sum of the column with
+# the given key
+def column_sum(hash, key)
+  return hash.values.inject(0) {|sum, row| sum + (row[key] || 0) }
+end
+
+# Prints a tracking-spreadsheet line for the given pings.
+def print_spreadsheet_count_line(date, pings)
+  arch_count = count_pings_by_attribute(pings, :arch)
+  version_count = count_pings_by_attribute(pings, :version)
+  os_and_version_count = count_pings_by_attribute_pair(pings, :major_os,
+                                                       :major_version)
+  version_lang_count = count_pings_by_attribute_pair(pings, :major_version,
+                                                     :lang)
+  cells = []
+  cells.push date.weekday_letter
+  cells.push date.strftime("%m/%d/%y")
+
+  cells.push pings.length
+  $by_arch_keys.each do |arch|
+    cells.push Integer(arch_count[arch])
+  end
+  $by_os_keys.each do |os|
+    os_counts = os_and_version_count[os]
+    cells.push os_counts ? Integer(os_counts.values.sum) : 0
+  end
+  $by_version_keys.each do |version|
+    cells.push Integer(version_count[version])
+  end
+  $by_major_version_keys.each do |major_version|
+    $os_keys_for_version[major_version].each do |os|
+      os_counts = os_and_version_count[os]
+      cells.push os_counts ? Integer(os_counts[major_version]) : 0
+    end
+  end
+  language_counts = version_lang_count[$language_count_version]
+  $by_language_keys.each do |lang|
+    cells.push Integer(language_counts[lang])
+  end
+
+  puts cells.join("\t")
+end
+
+def print_spreadsheet_percent_line(date, pings)
+  arch_count = count_pings_by_attribute(pings, :arch)
+  major_version_count = count_pings_by_attribute(pings, :major_version)
+  version_count = count_pings_by_attribute(pings, :version)
+  os_and_version_count = count_pings_by_attribute_pair(pings, :major_os,
+                                                       :major_version)
+  version_lang_count = count_pings_by_attribute_pair(pings, :major_version,
+                                                     :lang)
+  cells = []
+  cells.push date.weekday_letter
+  cells.push date.strftime("%m/%d/%y")
+
+  total = pings.length
+  cells.push total
+  $by_major_version_keys.each do |version|
+    cells.push long_percent(major_version_count[version], total)
+  end
+  $by_arch_keys.each do |arch|
+    cells.push long_percent(arch_count[arch], total)
+  end
+  $by_version_keys.each do |version|
+    major_version_total = major_version_count[major_version_component(version)]
+    cells.push long_percent(version_count[version], major_version_total)
+  end
+  $by_major_version_keys.each do |major_version|
+    version_total = column_sum(os_and_version_count, major_version)
+    $os_keys_for_version[major_version].each do |os|
+      os_counts = os_and_version_count[os]
+      cells.push long_percent(os_counts && os_counts[major_version],
+                              version_total)
+    end
+  end
+  $by_os_keys.each do |os|
+    next if os == '10.3'  # Everyone is on 1.6, so this isn't interesting.
+    os_counts = os_and_version_count[os]
+    os_total = os_counts ? os_counts.values.sum : 1
+    $by_major_version_keys.each do |major_version|
+      next unless ($os_keys_for_version[major_version].include?(os))
+      cells.push long_percent(os_counts && os_counts[major_version], os_total)
+    end
+  end
+  $by_os_keys.each do |os|
+    os_counts = os_and_version_count[os]
+    cells.push long_percent(os_counts && os_counts.values.sum, total)
+  end
+  language_counts = version_lang_count[$language_count_version]
+  language_total = language_counts.values.sum
+  $by_language_keys.each do |lang|
+    cells.push long_percent(language_counts[lang], language_total)
+  end
+
+  puts cells.join("\t")
+end
+
+# Prints human-readable tables with various ping breakdowns
+def print_overview_tables(pings)
+  print_heading("Arch vs OS")
+  arch_by_os = count_pings_by_attribute_pair(pings, :major_os, :arch)
+  print_percentage_table(arch_by_os)
+
+  print_heading("Arch vs Version")
+  arch_by_version = count_pings_by_attribute_pair(pings, :major_version, :arch)
+  print_percentage_table(arch_by_version)
+
+  print_heading("Version vs OS")
+  version_by_os = count_pings_by_attribute_pair(pings, :major_os,
+                                                :major_version)
+  print_percentage_table(version_by_os)
+
+  print_heading("#{$latest_major_version} Languages")
+  lang_by_version = count_pings_by_attribute_pair(pings, :major_version, :lang)
+  print_percentage_list(lang_by_version[$latest_major_version])
+end
+
+# Prints a section heading
+def print_heading(heading)
+  separator = "=================="
+  puts ['', separator, heading, separator].join("\n")
+end
+
+# Returns a formatted percent string for the given ratio rounded to the nearest
+# percent. Returns an empty string if |count| is nil.
+def short_percent(count, total)
+  return count ? sprintf("%.0f%%", 100.0 * count / total) : ''
+end
+
+# Returns a formatted percent string for the given ratio rounded to the nearest
+# hundredth of a percent. Returns an empty string if |count| is nil.
+def long_percent(count, total)
+  return count ? sprintf("%.2f%%", 100.0 * count / total) : ''
+end
+
+# Returns the date range corresponding to the given date argument.
+def date_range_for_argument(arg)
+  date_range = arg.split(',')
+  start_date = Date.parse(date_range[0])
+  end_date = Date.parse(date_range[-1])
+  return (start_date..end_date)
+end
+
+# Loads pings from the given files, removes the pings from bad IPs, and returns
+# a hash of date strings to the pings from those dates.
+# IPs removed.
+def load_filtered_pings_by_date(files)
+  pings = load_filtered_pings(files)
+  return partition_pings_by_attribute(pings, :date_str)
+end
+
+# Returns a array of pings extracted from the given files, with pings from bad
+# IPs removed.
+def load_filtered_pings(files)
+  pings = load_files(files)
+  pings.reject! {|ping| ping.from_bad_ip_address }
+end
+
+# Returns an array of ping data extracted from the given files.
+def load_files(files)
+  pings = []
+  files.each do |file|
+    File.foreach(file) do |line|
+      next unless UpdatePing.request_is_update_ping(line)
+      ping = UpdatePing.new(line)
+      pings.push(ping)
+    end
+  end
+  return pings
+end
+
+# Prints the ping counts by OS+arch pair.
+# TODO: Expose this as a flag; its currently unused.
+def print_os_arch_counts(pings)
+  arch_os_count = {}
+  pings.each do |ping|
+    key = "#{ping.major_os}-#{ping.arch}"
+    arch_os_count[key] ||= 0
+    arch_os_count[key] += 1
+  end
+  arch_os_count.keys.sort.reverse.each do |key|
+    puts "#{key} : #{arch_os_count[key]}"
+  end
+end
+
+# Given an array of pings and a ping attribute, returns a hash mapping each
+# unique value of the attribute to an array of pings with that value.
+def partition_pings_by_attribute(pings, attribute)
+  partitions = {}
+  pings.each do |ping|
+    key = ping.send attribute
+    partitions[key] ||= []
+    partitions[key].push(ping)
+  end
+  return partitions
+end
+
+# Given an array of pings and a ping attribute, returns a hash mapping each
+# unique value of the attribute to the number of pings with that value
+def count_pings_by_attribute(pings, attribute)
+  counts = {}
+  pings.each do |ping|
+    key = ping.send attribute
+    counts[key] ||= 0
+    counts[key] += 1
+  end
+  return counts
+end
+
+# Given an array of pings and two ping attributes, returns a two-dimensional
+# hash of the counts of pings matching both attributes.
+def count_pings_by_attribute_pair(pings, attribute, subattribute)
+  counts = {}
+  pings.each do |ping|
+    key1 = ping.send attribute
+    key2 = ping.send subattribute
+    counts[key1] ||= {}
+    counts[key1][key2] ||= 0
+    counts[key1][key2] += 1
+  end
+  return counts
+end
+
+# Creates and returns the regex to use for testing for bad IP addresses.
+def create_bad_ip_regex
+  bad_ip_patterns = $bad_ips.collect {|ip|
+    octets = ip.split('.', 4)
+    octets[3] = '.*' if octets[3].empty?
+    octets.join('\.')
+  }
+  return Regexp.compile("^(#{ bad_ip_patterns.join('|') })$")
+end
+
+# Returns the major version for the given full version (e.g., 2.0 for 2.0.7)
+def major_version_component(version)
+  return version.split(/[.abp]/)[0..1].join('.')
+end
+
+class Date
+  # Returns a string representation of the given date that matches an
+  # UpdatePing's date_str attribute.
+  def date_str
+    return strftime("%d/%b/%Y")
+  end
+
+  # Returns the first letter of the weekday
+  def weekday_letter
+    return strftime("%a")[0..0]
+  end
+end
+
+
+# A object representing a specific update ping.
+class UpdatePing
+  attr_accessor :ip, :date_str, :os, :arch, :version, :intl, :lang
+
+  # Regex for parsing an upadate request log line, which looks like:
+  # 12.34.56.789 - - [21/Mar/2011:01:46:46 -0700] "GET /update-check?os=10.6.6&arch=x86&version=2.0.6&intl=1&lang=es HTTP/1.1" 200 1135 "-" "Camino/2.0.6 Sparkle/1.5"
+  @@ping_parsing_regex = Regexp.compile('(^[\d.]+).*?\[([^:]+):.*?os=([^&]+)&arch=([^&]+)&version=([^&I]+)(?:I[^&]*)?&intl=(\d)(?:&lang=([\w]+))?')
+
+  # Regex for testing whether a request is for the update ping URL.
+  @@ping_test_regex = Regexp.compile('GET /update-check.*Sparkle')
+
+  # Regex for testing whether an IP should be filtered out.
+  @@bad_ip_regex = create_bad_ip_regex()
+
+  def initialize(log_line)
+    match = @@ping_parsing_regex.match(log_line)
+    if (!match)
+      # Treat parse failures as fatal, so regex mistakes are caught.
+      puts "Error: unparseable ping: '#{log_line.chomp}'"
+      exit
+    end
+    @ip = match[1]
+    # Using Date objects makes parsing several orders of magnitude more
+    # expensive, so just work with strings instead.
+    @date_str = match[2]
+    @os = match[3]
+    @arch = match[4]
+    @version = match[5]
+    @intl = match[6] == '1'
+    @lang = match[7] || 'en'
+  end
+
+  def self.request_is_update_ping(log_line)
+    return !@@ping_test_regex.match(log_line).nil?
+  end
+
+  # Returns just the major OS version (e.g., 10.5)
+  def major_os
+    @major_os ||= major_version_component(@os)
+    return @major_os
+  end
+
+  # Returns just the major Camino version (e.g., 2.1)
+  def major_version
+    @major_version ||= major_version_component(@version)
+    return @major_version
+  end
+
+  # Returns true if the ping is from a bad IP address
+  def from_bad_ip_address
+    return @@bad_ip_regex.match(@ip)
+  end
+end
+
+class Array
+  def sum
+    inject(0) { |sum, value| sum + value }
+  end
+end
+
+main

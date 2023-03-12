@@ -1,0 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#include "nsISupports.idl"
+
+/**
+ * Provides the interface supported by Firefox and IE for installing OpenSearch
+ * providers from JavaScript.
+ */
+
+[scriptable, uuid(bc5cb012-8b89-4b4c-8994-c321f1f15fbf)]
+interface chIAddSearchProviderHandler : nsISupports
+{
+  /**
+   * The capital "Add" is non-standard, but since that's the way it
+   * actually exists on the internet, that's what we need to use.
+   */
+  void AddSearchProvider(in AString aDescriptionURL);
+};

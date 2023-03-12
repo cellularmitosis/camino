@@ -1,0 +1,63 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+html {
+  background: -moz-dialog;
+}
+
+body {
+  color: -moz-FieldText;
+  background: -moz-Field;
+  font: message-box;
+  margin: 4em auto;
+  padding: 3em;
+  min-width: 230px;
+  max-width: 40em;
+  border: 2px solid #dadada;
+  -moz-border-radius: 15px;
+  -moz-box-shadow: -4px 4px 8px rgba(0,0,0,0.12), 4px 4px 8px rgba(0,0,0,0.12);
+}
+
+h1 {
+  font-weight: normal;
+  font-size: 240%;
+  color: #0141b7;
+  background: transparent;
+  text-align: left;
+  border-bottom: 1px solid ThreeDLightShadow;
+  padding-bottom: .2em;
+  margin: 0 0 .6em 0;
+}
+
+label {
+  -moz-user-select: text;
+}
+
+h2 {
+  margin-top: 0;
+  font-weight: bold;
+  font-size: large;
+}
+
+.memBox {
+  max-width: 90%;
+  background: white;
+  color: inherit;
+  margin: 1em auto 0;
+  padding: 5px 5px 1em;
+  border-bottom: 1px solid ThreeDLightShadow;
+}
+
+.memBox:last-of-type {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.memValue {
+  text-align: right;
+}
+
+.memOverview table {
+  font-size: 120%;
+}

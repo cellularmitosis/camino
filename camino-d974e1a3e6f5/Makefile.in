@@ -1,0 +1,421 @@
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+DEPTH		= ..
+topsrcdir	= @top_srcdir@
+srcdir		= @srcdir@
+VPATH		= @srcdir@
+
+include $(DEPTH)/config/autoconf.mk
+
+DIRS = \
+	feedhandlers \
+	flashblock \
+	geckochrome \
+	idl \
+	jsbridge \
+	striptease \
+	safebrowsing \
+	typeaheadfind \
+	$(NULL)
+
+APP_NAME	= Camino
+
+RSYNC_ALL = rsync -aC --exclude '*.xcodeproj/*.mode*' --exclude '*.xcodeproj/*.pbxuser' --delete
+
+CM_APP_VERSION_FILE = $(srcdir)/config/version.txt
+CM_APP_VERSION := $(shell cat $(CM_APP_VERSION_FILE))
+CM_COPYRIGHT_YEAR_FILE = $(srcdir)/config/year.txt
+CM_COPYRIGHT_YEAR := $(shell cat $(CM_COPYRIGHT_YEAR_FILE))
+FOX_APP_VERSION_FILE = $(topsrcdir)/browser/config/version.txt
+FOX_APP_VERSION := $(shell cat $(FOX_APP_VERSION_FILE))
+PLATFORM_VERSION_FILE = $(topsrcdir)/config/milestone.txt
+PLATFORM_VERSION := $(shell egrep "^[^\#]+" $(PLATFORM_VERSION_FILE))
+PLATFORM_BUILD_ID_FILE = $(DEPTH)/config/buildid
+PLATFORM_BUILD_ID := $(shell cat $(PLATFORM_BUILD_ID_FILE))
+
+ifdef MOZILLA_OFFICIAL
+APP_UPDATE_URL = https://caminobrowser.org/update-check
+APP_UPDATES_ENABLED = true
+BREAKPAD_UPLOAD_URL = https://crash-reports.mozilla.com/submit
+else
+APP_UPDATES_ENABLED ?= false
+endif
+
+# For Launch Services compatibility, CFBundleVersion can be at most three
+# .-separated integers, aaaaaa.bb.cc, with a maximum of 429496.99.99.  Use
+# Camino's major and minor version number and the build date as the basis for
+# CFBundleVersion.  This transforms version a.b (and any alphas, betas,
+# prereleases, and bug-fix versions) built on date 20yy.mm.dd into
+# CFBundleVersion abyy.mm.dd.  Only a and b from the version need to be
+# significant, since any further updates (a.b.c) will necessarily be built on
+# future dates, and will have larger CFBundleVersion values.  This mapping
+# assumes 0 <= b <= 9 and is not year 2100-compliant.  There is currently no
+# CM_APP_VERSION_CFBUNDLE_FILE to depend on; any rule that uses this value
+# should depend on CM_APP_VERSION_FILE and PLATFORM_BUILD_ID_FILE.
+CM_APP_VERSION_CFBUNDLE := $(shell echo $(CM_APP_VERSION)@$(PLATFORM_BUILD_ID) | \
+                             sed -E -e 's/^([0-9]+)\.([0-9]).*@[02]0([0-9]{2})([0-9]{2})([0-9]{2})[0-9]{6}$$/\1\2\3.\4.\5/')
+
+# Info.plist needs to have keys for some values removed, instead of placing
+# empty values.  Start out with a pattern that doesn't exist to give something
+# to append "or" regex clauses to.
+GREP_V_PATTERN = __dummy__
+
+# If an Hg tag (or branch) can be determined, use it as the Hg tag name in
+# Info.plist.  If no tag can be found, set up to remove the relevant key from
+# Info.plist.
+HG_TAG_FILE = generated/hg_tag
+HG_TAG := $(MOZ_HG_TAG)
+ifdef HG_TAG
+SED_ARGS += -e "s/%HG_TAG%/$(HG_TAG)/"
+else  # HG_TAG
+# Add the extra dummy pattern to ensure that make can't add whitespace to the
+# strings we care about.
+GREP_V_PATTERN += \|MozillaHgTag\|%HG_TAG%\|__dummy__
+endif  # HG_TAG
+
+# Generate the Gecko and Camino changeset and repository names
+# make+shell+sed = awful
+_dollar=$$
+
+PLATFORM_CHANGESET_FILE = generated/platform_changeset
+PLATFORM_CHANGESET := $(shell hg -R $(topsrcdir) parent --template="{node|short}\n" 2>/dev/null)
+ifdef PLATFORM_CHANGESET
+SED_ARGS += -e "s/%PLATFORM_CHANGESET%/$(PLATFORM_CHANGESET)/"
+else  # PLATFORM_CHANGESET
+# Add the extra dummy pattern to ensure that make can't add whitespace to the
+# strings we care about.
+GREP_V_PATTERN += \|MozillaChangeset\|%PLATFORM_CHANGESET%\|__dummy__
+endif  # PLATFORM_CHANGESET
+
+PLATFORM_REPO_FILE = generated/platform_repo
+PLATFORM_REPO := $(shell cd $(topsrcdir) && hg showconfig paths.default 2>/dev/null | head -n1 | sed -e "s/^ssh:/http:/" -e "s/\/$(_dollar)//" )
+ifdef PLATFORM_REPO
+SED_ARGS += -e "s|%PLATFORM_REPO%|$(PLATFORM_REPO)|"
+else  # PLATFORM_REPO
+# Add the extra dummy pattern to ensure that make can't add whitespace to the
+# strings we care about.
+GREP_V_PATTERN += \|MozillaRepository\|%PLATFORM_REPO%\|__dummy__
+endif  # PLATFORM_REPO
+
+CM_CHANGESET_FILE = generated/camino_changeset
+CM_CHANGESET := $(shell hg -R $(srcdir) parent --template="{node|short}\n" 2>/dev/null)
+ifdef CM_CHANGESET
+SED_ARGS += -e "s/%CM_CHANGESET%/$(CM_CHANGESET)/"
+else  # CM_CHANGESET
+# Add the extra dummy pattern to ensure that make can't add whitespace to the
+# strings we care about.
+GREP_V_PATTERN += \|CaminoChangeset\|%CM_CHANGESET%\|__dummy__
+endif  # CM_CHANGESET
+
+CM_REPO_FILE = generated/camino_repo
+CM_REPO := $(shell cd $(srcdir) && hg showconfig paths.default 2>/dev/null | head -n1 | sed -e "s/^ssh:/http:/" -e "s/\/$(_dollar)//" )
+ifdef CM_REPO
+SED_ARGS += -e "s|%CM_REPO%|$(CM_REPO)|"
+else  # CM_REPO
+# Add the extra dummy pattern to ensure that make can't add whitespace to the
+# strings we care about.
+GREP_V_PATTERN += \|CaminoRepository\|%CM_REPO%\|__dummy__
+endif  # CM_REPO
+
+STRINGS_FILES = \
+	resources/localized/English.lproj/CertificateDialogs.strings \
+	resources/localized/English.lproj/Localizable.strings \
+	resources/localized/English.lproj/ServicesMenu.strings \
+	PreferencePanes/Appearance/English.lproj/Localizable.strings \
+	PreferencePanes/Appearance/English.lproj/RegionNames.strings \
+	PreferencePanes/Downloads/English.lproj/Localizable.strings \
+	PreferencePanes/General/English.lproj/Localizable.strings \
+	PreferencePanes/History/English.lproj/Localizable.strings \
+	PreferencePanes/Privacy/English.lproj/Localizable.strings \
+	PreferencePanes/Security/English.lproj/Localizable.strings \
+	PreferencePanes/Tabs/English.lproj/Localizable.strings \
+	PreferencePanes/WebFeatures/English.lproj/Localizable.strings \
+	$(NULL)
+GENERATED_STRINGS_FILES = $(patsubst %,generated/%,$(STRINGS_FILES))
+
+GECKO_STRINGS_FILES = \
+	resources/localized/English.lproj/global-platform_locale_intl_properties.strings \
+	resources/localized/English.lproj/global-region_locale_region_properties.strings \
+	resources/localized/English.lproj/global_locale_appstrings_properties.strings \
+	resources/localized/English.lproj/global_locale_commonDialogs_properties.strings \
+	resources/localized/English.lproj/global_locale_config_properties.strings \
+	resources/localized/English.lproj/global_locale_crashes_properties.strings \
+	resources/localized/English.lproj/global_locale_css_properties.strings \
+	resources/localized/English.lproj/global_locale_dom_dom_properties.strings \
+	resources/localized/English.lproj/global_locale_layout_HtmlForm_properties.strings \
+	resources/localized/English.lproj/global_locale_layout_MediaDocument_properties.strings \
+	resources/localized/English.lproj/global_locale_layout_errors_properties.strings \
+	resources/localized/English.lproj/global_locale_layout_xmlparser_properties.strings \
+	resources/localized/English.lproj/global_locale_plugins_properties.strings \
+	resources/localized/English.lproj/global_locale_prompts_properties.strings \
+	resources/localized/English.lproj/global_locale_svg_svg_properties.strings \
+	resources/localized/English.lproj/global_locale_xslt_xslt_properties.strings \
+	resources/localized/English.lproj/necko_locale_necko_properties.strings \
+	resources/localized/English.lproj/pipnss_locale_nsserrors_properties.strings \
+	resources/localized/English.lproj/pipnss_locale_pipnss_properties.strings \
+	resources/localized/English.lproj/pipnss_locale_security_properties.strings \
+	$(NULL)
+GENERATED_GECKO_STRINGS_FILES = $(patsubst %,generated/%,$(GECKO_STRINGS_FILES))
+
+GECKO_CHROME_FILES = \
+	$(srcdir)/geckochrome/locale/en-US/global/config.dtd \
+	$(srcdir)/../dom/locales/en-US/chrome/global.dtd \
+	$(srcdir)/../toolkit/locales/en-US/chrome/global/mozilla.dtd \
+	$(srcdir)/geckochrome/locale/en-US/global/netError.dtd \
+	$(srcdir)/../dom/locales/en-US/chrome/xml/prettyprint.dtd \
+	$(srcdir)/geckochrome/locale/en-US/mozapps/plugins/plugins.dtd \
+	$(srcdir)/../dom/locales/en-US/chrome/security/caps.properties \
+	$(srcdir)/geckochrome/locale/en-US/global/typeaheadfind.properties \
+	$(NULL)
+GECKO_CHROME_GENERATED_DIR = generated/resources/localized/English.lproj
+GENERATED_GECKO_CHROME_FILES = \
+	$(patsubst %,$(GECKO_CHROME_GENERATED_DIR)/%,$(notdir $(GECKO_CHROME_FILES)))
+
+# Tell make which directories to examine for the GECKO_CHROME_FILES when
+# running the $(GENERATED_GECKO_CHROME_FILES) target.
+GECKO_CHROME_SOURCE_DIRS = $(dir $(GECKO_CHROME_FILES))
+vpath %.dtd $(GECKO_CHROME_SOURCE_DIRS)
+vpath %.properties $(GECKO_CHROME_SOURCE_DIRS)
+
+ifdef MOZ_DEBUG
+BUILDSTYLE	= Debug
+else
+BUILDSTYLE	= Release
+endif
+
+ifdef BUILD_STATIC_LIBS
+TARGET		= CaminoStatic
+else
+TARGET		= Camino
+endif
+
+SYMBOL_SOURCE_FILES = \
+	$(XCODE_PRODUCT_DIR)/*.dSYM/Contents/Resources/DWARF/* \
+	google-breakpad/src/client/mac/build/$(BUILDSTYLE)/Breakpad.framework.dSYM/Contents/Resources/DWARF/Breakpad \
+	google-breakpad/src/client/mac/build/$(BUILDSTYLE)/breakpadUtilities.dylib.dSYM/Contents/Resources/DWARF/breakpadUtilities.dylib \
+	growl/build/$(BUILDSTYLE)/Growl.framework.dSYM/Contents/Resources/DWARF/Growl \
+	sparkle/build/$(BUILDSTYLE)/Sparkle.framework.dSYM/Contents/Resources/DWARF/Sparkle \
+	$(XCODE_PRODUCT_DIR)/Camino.app/Contents/MacOS/*.dylib \
+	$(NULL)
+
+GARBAGE_DIRS += \
+	build \
+	$(DIST)/$(APP_NAME).app \
+	crashreporter-symbols \
+	generated \
+	growl/build \
+	sparkle/build \
+	google-breakpad/src/client/mac/build \
+	google-breakpad/src/tools/mac/dump_syms/build \
+	google-breakpad/src/tools/mac/crash_report/build \
+	google-breakpad/src/tools/mac/symupload/build \
+	$(NULL)
+
+include $(topsrcdir)/config/rules.mk
+
+unexport CC CXX
+
+ABS_topsrcdir := $(shell cd $(topsrcdir); pwd)
+
+SYMBOL_ARCHIVE_BASENAME = \
+	$(APP_NAME)-$(CM_APP_VERSION)-$(OS_TEST)-$(PLATFORM_BUILD_ID)
+SYMBOL_OUTPUT_DIR = crashreporter-symbols/$(PLATFORM_BUILD_ID)
+SYMBOL_ZIP_FILENAME = crashreporter-symbols-$(SYMBOL_ARCHIVE_BASENAME).zip
+SYMBOL_STORE_HOME_DIR = $(topsrcdir)/../$(PLATFORM_BUILD_ID)/symbols
+SYMBOL_REUPLOAD_SCRIPT_FILE = $(SYMBOL_STORE_HOME_DIR)/../upload-symbols-$(OS_TEST).sh
+# Export the SYMBOL_INDEX_NAME for toolit's upload_symbols.sh script's 
+# post-upload behavior
+export SYMBOL_INDEX_NAME = $(SYMBOL_ARCHIVE_BASENAME)-symbols.txt
+
+export::
+ifneq ($(ABS_topsrcdir),$(MOZ_BUILD_ROOT))
+	$(RSYNC_ALL) $(srcdir)/Camino.xcodeproj .
+	ln -fs $(srcdir)/src
+	ln -fs $(srcdir)/resources
+	ln -fs $(srcdir)/config
+	ln -fs $(srcdir)/scripts
+	ln -fs $(srcdir)/PreferencePanes
+	ln -fs $(srcdir)/Info-*.plist .
+	mkdir -p sparkle growl \
+	  google-breakpad/src/client/mac \
+	  google-breakpad/src/tools/mac/dump_syms \
+	  google-breakpad/src/tools/mac/crash_report \
+	  google-breakpad/src/tools/mac/symupload
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/sparkle/!(CVS|*.xcodeproj|build) sparkle"
+	$(RSYNC_ALL) $(ABS_topsrcdir)/camino/sparkle/*.xcodeproj sparkle
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/growl/!(CVS|*.xcodeproj|build) growl"
+	$(RSYNC_ALL) $(ABS_topsrcdir)/camino/growl/*.xcodeproj growl
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/!(CVS|build|src) google-breakpad"
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/src/!(CVS|build|client|tools) google-breakpad/src"
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/src/client/!(CVS|build|mac) google-breakpad/src/client"
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/src/client/mac/!(CVS|build|*.xcodeproj) google-breakpad/src/client/mac"
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/src/tools/mac/dump_syms/!(CVS|build|*.xcodeproj) google-breakpad/src/tools/mac/dump_syms"
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/src/tools/mac/crash_report/!(CVS|build|*.xcodeproj) google-breakpad/src/tools/mac/crash_report"
+	bash -O extglob -c \
+	  "ln -fs $(ABS_topsrcdir)/camino/google-breakpad/src/tools/mac/symupload/!(CVS|build|*.xcodeproj) google-breakpad/src/tools/mac/symupload"
+	$(RSYNC_ALL) $(ABS_topsrcdir)/camino/google-breakpad/src/client/mac/*.xcodeproj google-breakpad/src/client/mac
+	$(RSYNC_ALL) $(ABS_topsrcdir)/camino/google-breakpad/src/tools/mac/dump_syms/*.xcodeproj google-breakpad/src/tools/mac/dump_syms
+	$(RSYNC_ALL) $(ABS_topsrcdir)/camino/google-breakpad/src/tools/mac/crash_report/*.xcodeproj google-breakpad/src/tools/mac/crash_report
+	$(RSYNC_ALL) $(ABS_topsrcdir)/camino/google-breakpad/src/tools/mac/symupload/*.xcodeproj google-breakpad/src/tools/mac/symupload
+endif
+
+# Generate files which need to pull version numbers or dates from other files
+# in the tree
+generated/resources/application/all-camino.js: \
+  $(srcdir)/resources/application/all-camino.js.in \
+  $(FOX_APP_VERSION_FILE) \
+  $(CM_APP_VERSION_FILE)
+	mkdir -p $(dir $@)
+	sed -e "s/%FOX_APP_VERSION%/$(FOX_APP_VERSION)/" \
+	    -e "s/%CM_APP_VERSION%/$(CM_APP_VERSION)/" \
+	    -e "s@%APP_UPDATE_URL%@$(APP_UPDATE_URL)@" $< > $@
+
+generated/Info-Camino.plist: \
+  $(srcdir)/Info-Camino.plist.in \
+  $(CM_APP_VERSION_FILE) \
+  $(CM_COPYRIGHT_YEAR_FILE) \
+  $(PLATFORM_BUILD_ID_FILE) \
+  $(PLATFORM_VERSION_FILE) \
+  $(PLATFORM_CHANGESET_FILE) \
+  $(PLATFORM_REPO_FILE) \
+  $(CM_CHANGESET_FILE) \
+  $(CM_REPO_FILE) \
+  $(HG_TAG_FILE)
+	mkdir -p $(dir $@)
+	sed -e "s/%CM_APP_VERSION%/$(CM_APP_VERSION)/" \
+	    -e "s/%CM_APP_VERSION_CFBUNDLE%/$(CM_APP_VERSION_CFBUNDLE)/" \
+	    -e "s/%CM_COPYRIGHT_YEAR%/$(CM_COPYRIGHT_YEAR)/" \
+	    -e "s/%PLATFORM_BUILD_ID%/$(PLATFORM_BUILD_ID)/" \
+	    -e "s/%PLATFORM_VERSION%/$(PLATFORM_VERSION)/" \
+	    -e "s/%APP_UPDATES_ENABLED%/$(APP_UPDATES_ENABLED)/" \
+	    -e "s@%BREAKPAD_UPLOAD_URL%@$(BREAKPAD_UPLOAD_URL)@" \
+	    $(SED_ARGS) $< | \
+	grep -v "$(GREP_V_PATTERN)" > $@
+
+generated/resources/localized/English.lproj/InfoPlist.strings: \
+  $(srcdir)/resources/localized/English.lproj/InfoPlist.strings.in \
+  $(CM_APP_VERSION_FILE) \
+  $(CM_COPYRIGHT_YEAR_FILE)
+	mkdir -p $(dir $@)
+	sed -e "s/%CM_APP_VERSION%/$(CM_APP_VERSION)/" \
+	    -e "s/%CM_COPYRIGHT_YEAR%/$(CM_COPYRIGHT_YEAR)/" $< | \
+	  iconv -f UTF-8 -t UTF-16 > $@
+
+# Generate UTF-16 with BOM strings files from UTF-8 strings.in files.  On Mac
+# OS X, iconv seems always to output big-endian when asked for UTF-16 with a
+# BOM, which is what AppleGlot seems to require.
+$(GENERATED_STRINGS_FILES): \
+  generated/%.strings: $(srcdir)/%.strings.in
+	mkdir -p $(dir $@)
+	iconv -f UTF-8 -t UTF-16 $< > $@
+
+# Generate UTF-16 with BOM strings files from Gecko properties files.  On Mac
+# OS X, iconv seems always to output big-endian when asked for UTF-16 with a
+# BOM, which is what AppleGlot seems to require.  In a real auto-generate 
+# system, this rule would also fix comments, escape quotes and reformat 
+# strings.
+$(GENERATED_GECKO_STRINGS_FILES): \
+  generated/%.strings: $(srcdir)/%.strings.in
+	mkdir -p $(dir $@)
+	iconv -f UTF-8 -t UTF-16 $< > $@
+
+# Pull Gecko .dtd and .properties files that are being localized via ChromeML
+# from their source locations (so that they are always up-to-date) and copy 
+# them to generated/ so that the project can easily package them without
+# requiring an extra copy of the files in the source tree.
+$(GENERATED_GECKO_CHROME_FILES): \
+  $(GECKO_CHROME_GENERATED_DIR)/%: %
+	mkdir -p $(dir $@)
+	cp -p $< $@
+
+# The "grep -lFx" construct in these rules will only touch the file if the
+# contents are changing.  The file's timestamp will be preserved when the
+# contents aren't changing, reducing unnecessary build activity.
+
+$(HG_TAG_FILE): FORCE
+	grep -lFx "$(HG_TAG)" $@ >& /dev/null || \
+	  (mkdir -p $(dir $@) && echo "$(HG_TAG)" > $@)
+
+$(PLATFORM_CHANGESET_FILE): FORCE
+	grep -lFx "$(PLATFORM_CHANGESET)" $@ >& /dev/null || \
+	  (mkdir -p $(dir $@) && echo "$(PLATFORM_CHANGESET)" > $@)
+
+$(PLATFORM_REPO_FILE): FORCE
+	grep -lFx "$(PLATFORM_REPO)" $@ >& /dev/null || \
+	  (mkdir -p $(dir $@) && echo "$(PLATFORM_REPO)" > $@)
+
+$(CM_CHANGESET_FILE): FORCE
+	grep -lFx "$(CM_CHANGESET)" $@ >& /dev/null || \
+	  (mkdir -p $(dir $@) && echo "$(CM_CHANGESET)" > $@)
+
+$(CM_REPO_FILE): FORCE
+	grep -lFx "$(CM_REPO)" $@ >& /dev/null || \
+	  (mkdir -p $(dir $@) && echo "$(CM_REPO)" > $@)
+
+# In a real auto-generate system, $(GENERATED_GECKO_STRINGS_FILES) would need
+# to be called after making in geckochrome (which would itself be followed by a
+# .properties extraction rule).
+libs:: \
+  generated/resources/application/all-camino.js \
+  generated/Info-Camino.plist \
+  generated/resources/localized/English.lproj/InfoPlist.strings \
+  $(GENERATED_STRINGS_FILES) \
+  $(GENERATED_GECKO_STRINGS_FILES) \
+  $(GENERATED_GECKO_CHROME_FILES)
+	$(PBBUILD) -project Camino.xcodeproj -target $(TARGET) \
+	  -configuration $(BUILDSTYLE) $(PBBUILD_SETTINGS)
+	$(RSYNC_ALL) --copy-unsafe-links \
+	  $(XCODE_PRODUCT_DIR)/Camino.app/ $(DIST)/$(APP_NAME).app
+	$(RM) $(DIST)/$(APP_NAME).app/Contents/MacOS/components/camino.xpt
+	$(XPIDL_LINK) $(DIST)/$(APP_NAME).app/Contents/MacOS/camino.xpt \
+	  $(DIST)/$(APP_NAME).app/Contents/MacOS/components/*.xpt
+	$(RM) $(DIST)/$(APP_NAME).app/Contents/MacOS/components/*.xpt
+	mv $(DIST)/$(APP_NAME).app/Contents/MacOS/camino.xpt \
+	  $(DIST)/$(APP_NAME).app/Contents/MacOS/components/camino.xpt
+
+buildcaminosymbols:
+	$(PBBUILD) -project google-breakpad/src/tools/mac/dump_syms/dump_syms.xcodeproj \
+	  -configuration $(BUILDSTYLE)
+	@echo Generating symbols
+	mkdir -p $(SYMBOL_OUTPUT_DIR)
+	$(PYTHON) $(srcdir)/scripts/symbolstore.py \
+	  -a $(OS_TEST) -s $(shell pwd),$(srcdir) -s $(topsrcdir) --vcs-info \
+	  google-breakpad/src/tools/mac/dump_syms/build/$(BUILDSTYLE)/dump_syms \
+	  $(SYMBOL_OUTPUT_DIR) \
+	  $(SYMBOL_SOURCE_FILES) > \
+	  $(SYMBOL_OUTPUT_DIR)/$(SYMBOL_INDEX_NAME)
+
+uploadcaminosymbols:
+	@echo Zipping symbols
+	cd $(SYMBOL_OUTPUT_DIR) && \
+	  zip -r9D ../$(SYMBOL_ZIP_FILENAME) .
+	@echo Storing symbols
+	mkdir -p $(SYMBOL_STORE_HOME_DIR)
+	cp -r -p -v \
+	  $(SYMBOL_OUTPUT_DIR)/../$(SYMBOL_ZIP_FILENAME) \
+	  $(SYMBOL_STORE_HOME_DIR)/$(SYMBOL_ZIP_FILENAME)
+	@echo Creating re-upload script
+	echo '#!/bin/sh\n\n \
+	  export SYMBOL_INDEX_NAME="$(SYMBOL_INDEX_NAME)"\n\n \
+	  export POST_SYMBOL_UPLOAD_CMD="$(POST_SYMBOL_UPLOAD_CMD)"\n\n \
+	  SYMBOL_SERVER_HOST=$(SYMBOL_SERVER_HOST) \
+	  SYMBOL_SERVER_USER=$(SYMBOL_SERVER_USER) \
+	  SYMBOL_SERVER_PATH=$(SYMBOL_SERVER_PATH) \
+	  SYMBOL_SERVER_SSH_KEY=$(SYMBOL_SERVER_SSH_KEY) \
+	  $(topsrcdir)/toolkit/crashreporter/tools/upload_symbols.sh \
+	  $(SYMBOL_STORE_HOME_DIR)/$(SYMBOL_ZIP_FILENAME)' | \
+	  sed -e 's/  //g' -e 's/^ //g' > \
+	  $(SYMBOL_REUPLOAD_SCRIPT_FILE)
+	chmod 755 $(SYMBOL_REUPLOAD_SCRIPT_FILE) 
+	@echo Uploading symbols
+	$(topsrcdir)/toolkit/crashreporter/tools/upload_symbols.sh $(SYMBOL_OUTPUT_DIR)/../$(SYMBOL_ZIP_FILENAME)

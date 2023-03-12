@@ -1,0 +1,59 @@
+<?xml version="1.0"?>
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<!DOCTYPE bindings [
+<!ENTITY % bindingsDTD SYSTEM "chrome://mozapps/locale/plugins/plugins.dtd">
+<!ENTITY % globalDTD SYSTEM "chrome://global/locale/global.dtd">
+%bindingsDTD;
+%globalDTD;
+<!ENTITY reloadPlugin.pre    "">
+<!ENTITY reloadPlugin.middle "Reload the page">
+<!ENTITY reloadPlugin.post   " to try again">
+<!ENTITY report.please       "Send crash report">
+<!ENTITY report.submitting   "Sending report…">
+<!ENTITY report.submitted    "Crash report sent.">
+<!ENTITY report.disabled     "Crash reporting disabled.">
+<!ENTITY report.failed       "Submission failed.">
+<!ENTITY report.unavailable  "No report available.">
+]>
+
+<bindings id="pluginBindings"
+              xmlns="http://www.mozilla.org/xbl"
+              xmlns:xul="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+              xmlns:html="http://www.w3.org/1999/xhtml">
+<binding id="pluginProblem" inheritstyle="false">
+    <resources>
+        <stylesheet src="chrome://mozapps/content/plugins/pluginProblemLorentz.css"/>
+        <stylesheet src="chrome://mozapps/skin/plugins/pluginProblem.css"/>
+        <stylesheet src="chrome://mozapps/content/plugins/pluginProblemContent.css"/>
+    </resources>
+
+    <content>
+        <xul:vbox class="mainBox" role="link" flex="1" chromedir="&locale.dir;">
+            <xul:spacer flex="1"/>
+            <xul:box class="icon"/>
+            <html:div class="msg msgUnsupported">&missingPlugin.label; <html:a href="http://caminobrowser.org/documentation/setup/#find_plugin" target="_blank">&pluginLink.label;</html:a>.</html:div>
+            <html:div class="msg msgDisabled">&disabledPlugin.label; <html:a href="http://caminobrowser.org/documentation/setup/#disable_plugin" target="_blank">&pluginLink.label;</html:a>.</html:div>
+            <html:div class="msg msgBlocked">&blockedPlugin.label; <html:a href="http://caminobrowser.org/documentation/setup/#blocked_plugin" target="_blank">&pluginLink.label;</html:a>.</html:div>
+            <html:div class="msg msgCrashed"><!-- set at runtime --></html:div>
+            <html:div class="submitStatus">
+                <!-- link href set at runtime -->
+                <html:div class="msg msgPleaseSubmit"><html:a class="pleaseSubmitLink" href="">&report.please;</html:a></html:div>
+                <html:div class="msg msgSubmitting">&report.submitting;<html:span class="throbber"> </html:span></html:div>
+                <html:div class="msg msgSubmitted">&report.submitted;</html:div>
+                <html:div class="msg msgNotSubmitted">&report.disabled;</html:div>
+                <html:div class="msg msgSubmitFailed">&report.failed;</html:div>
+                <html:div class="msg msgNoCrashReport">&report.unavailable;</html:div>
+                <!-- link href set at runtime -->
+                <html:div class="msg msgReload">&reloadPlugin.pre;<html:a class="reloadLink" href="">&reloadPlugin.middle;</html:a>&reloadPlugin.post;</html:div>
+            </html:div>
+            <xul:spacer flex="1"/>
+            <html:div class="msg msgBottomLinks">
+                <html:span class="helpIcon" role="link"/>
+            </html:div>
+        </xul:vbox>
+        <html:div style="display:none;"><children/></html:div>
+    </content>
+</binding>
+</bindings>

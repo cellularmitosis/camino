@@ -1,0 +1,29 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
+/*
+ * CSS rules to prevent author styling of pop-up menu <select> form controls.
+ * Multi-line list-boxes (select[multiple], select[size]) are not affected.
+ * Work-around for ugly display of pop-up menu widgets - bug 394063.
+ */
+
+select:not([size]):not([multiple]),
+select[size="0"],
+select[size="1"] {
+  -moz-appearance: menulist !important;
+  border-color: -moz-initial !important;
+  background: -moz-initial !important;
+  color: -moz-initial !important;
+  padding: -moz-initial !important;
+  font: -moz-list !important;
+  border-width: -moz-initial !important;
+  border-style: -moz-initial !important;
+  text-indent: -moz-initial !important;
+}
+
+select:not([size]):not([multiple])[disabled],
+select[size="0"][disabled],
+select[size="1"][disabled] {
+  color: GrayText !important;
+}

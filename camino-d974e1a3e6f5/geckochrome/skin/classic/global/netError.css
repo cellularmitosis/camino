@@ -1,0 +1,216 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+/*
+ *  This file defines the styles of the network, blocked site
+ *  (safe browsing), and certificate error pages.  See 
+ *  netError.xhtml (in docshell), blockedSite.xhtml, and 
+ *  certError.xhtml.
+ *
+ *  Original styling by William Price <bugzilla@mob.rice.edu>
+ *  Updated by: Steven Garrity <steven@silverorange.com>
+ *              Henrik Skupin  <mozilla@hskupin.info>
+ *              Jon Hicks <jon@hicksdesign.co.uk>
+ *              Philippe Wittenbergh <phiw@l-c-n.com>
+ *              Sean Murphy <murph@seanmurph.com> (Blacklist styling)
+ */
+
+html {
+  background: #f2f2f2;
+}
+
+body {
+  margin: 0;
+  padding: 0 1em;
+  color: #000;
+  font: message-box;
+}
+
+h1 {
+  margin: 0 0 .3em 0;
+  font-size: 240%;
+  color: #000;
+  font-weight: normal;
+}
+
+ul, ol {
+  margin: 0 0 1em 0;
+  -moz-margin-start: 1.5em;
+  padding: 0;
+}
+
+*|*::-moz-list-bullet {
+  color: #aaa;
+  font-size: 1.2em
+}
+
+ul > li, ol > li {
+  margin-bottom: .7em;
+}
+
+ul {
+  list-style: disc;
+}
+
+#errorPageContainer {
+  position: relative;
+  min-width: 13em;
+  max-width: 52em;
+  margin: 4em auto;
+  border: 2px solid #dadada;
+  -moz-border-radius: 15px;
+  padding: 3em;
+  -moz-padding-start: 60px;
+  background: url("chrome://global/skin/icons/warning.png") 1.1em 1.6em no-repeat -moz-Field;
+  -moz-background-size: 100px 100px;
+  -moz-box-shadow: -4px 4px 8px rgba(0,0,0,0.12), 4px 4px 8px rgba(0,0,0,0.12);
+}
+
+body[dir="rtl"] #errorPageContainer {
+  background-position: right 0;
+}
+
+#errorTitle {
+  -moz-margin-start: 64px;
+}
+
+#errorLongContent {
+  -moz-margin-start: 64px;
+}
+
+#errorShortDesc > p,
+#introContent > p {
+  overflow: auto;
+  font-size: 130%;
+  color: #0141b7;
+  white-space: pre-wrap;
+}
+
+#errorShortDesc > p,
+#introContent {
+  border-bottom: 1px solid ThreeDLightShadow;
+}
+
+#errorShortDesc > p {
+  padding-bottom: 1em;
+}
+
+#technicalContentText {
+  overflow: auto;
+  white-space: pre-wrap;
+}
+
+#technicalContent > h2,
+#expertContent > h2 {
+  cursor: pointer;
+}
+
+#technicalContent > h2:before,
+#expertContent > h2:before {
+  content: '▼';
+  margin-left: -1.3em;
+  padding-right: .35em;
+  width: 1em;
+  display: inline-block;
+  font-size: 75%;
+  color: #aaa;
+}
+
+#technicalContent[collapsed] > h2:before,
+#expertContent[collapsed] > h2:before {
+  content: '▶';
+}
+
+div[collapsed] > p,
+div[collapsed] > div {
+  display: none;
+}
+
+#errorLongDesc {
+  -moz-padding-end: 3em;
+  font-size: 110%;
+}
+
+#errorTryAgain {
+  margin-top: 2em;
+  -moz-margin-start: 64px;
+}
+
+#errorContainer {
+  display: none;
+}
+
+#expertContent div {
+  background-color: #ffdd7f; /* pale orange */
+  padding: 1.3em 1.5em;
+  border: 1px solid transparent; /* bug 505946 */
+  -moz-border-radius: 15px;
+  -moz-margin-end: 1.5em;
+  -moz-margin-start: -1.5em;
+}
+
+#expertContent p {
+  margin: 0 0 1em;
+}
+
+#whatShouldIDoContent button,
+#expertContent button {
+  margin: 0;
+}
+
+/* Custom styling for 'blacklist' error class - bug 380932  */
+:root.blacklist #errorTitle, :root.blacklist #errorLongContent,
+:root.blacklist #errorShortDesc, :root.blacklist #errorLongDesc {
+  background-color: #e8e8e8;
+  color: #000;
+}
+
+:root.blacklist #errorPageContainer {
+  background-image: url("chrome://global/skin/icons/blacklist.png");
+  background-color: #e8e8e8;
+  -moz-background-size: 100px 100px;
+  border: 2px solid #000;
+  -moz-box-shadow: -4px 4px 8px rgba(0,0,0,0.3), 4px 4px 8px rgba(0,0,0,0.3);
+}
+
+:root.blacklist {
+  background: #722;
+}
+
+:root.blacklist #errorTryAgain {
+  display: none;
+}
+
+:root.blacklist #errorShortDesc > p {
+  color: #000;
+  font-weight: bold;
+  border-bottom: 1px solid #000;
+}
+
+:root.blacklist #errorTitle h1 {
+  color: #722;
+}
+
+:root.blacklist #buttons {
+  padding-top: 10px;
+  text-align: right;
+}
+
+/* Per HIG, there should be 24px between dangerous buttons and other
+   buttons. The buttons have a 6px margin on each side by default
+   (beginning after the 1px shadow) and the whitespace node between the
+   buttons takes 4px. Since Cocoa does not consider the shadow to be
+   part of the button’s width, use 12px as margin-right to achieve 24px
+   of space between the two buttons.
+*/
+:root.blacklist #ignoreWarningButton {
+  margin-right: 12px;
+}
+
+/* Align the button’s right edge with the right edge of the 
+   border-bottom from the errorShortDesc div.
+*/
+:root.blacklist #getMeOutButton {
+  margin-right: -2px;
+}

@@ -1,0 +1,317 @@
+/* -*- Mode: C++; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- */
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+#import <Cocoa/Cocoa.h>
+#import "CHBrowserView.h"
+#import "TransientBar.h"
+
+@class BrowserWindowController;
+@class ToolTip;
+@class FormFillController;
+@class AutoCompleteTextField;
+@class RolloverImageButton;
+@class FindBarController;
+@class SafeBrowsingBar;
+@class KeychainBrowserListener;
+
+class nsIMutableArray;
+class nsIArray;
+
+extern NSString* const kBrowserInstanceClosedNotification;
+
+typedef enum {
+    CHSwipeGestureDirectionLeft = 0,
+    CHSwipeGestureDirectionRight,
+    CHSwipeGestureDirectionUp,
+    CHSwipeGestureDirectionDown
+} CHSwipeGestureDirection;
+
+// 
+// The BrowserWrapper communicates with the UI via this delegate.
+// The delegate will be nil for background tabs.
+// 
+@protocol BrowserUIDelegate
+
+- (void)loadingStarted;
+- (void)loadingDone:(BOOL)activateContent;
+
+// a progress value of 0.0 will set the meter to its indeterminate state
+- (void)setLoadingProgress:(float)progress;
+
+- (void)updateWindowTitle:(NSString*)title;
+- (void)updateStatus:(NSString*)status;
+
+- (void)updateLocationFields:(NSString*)url ignoreTyping:(BOOL)ignoreTyping;
+- (void)updateSiteIcons:(NSImage*)icon;
+
+- (void)showPopupBlocked:(BOOL)blocked;
+- (void)showSecurityState:(unsigned long)state;
+- (void)showFeedDetected:(BOOL)inDetected;
+- (void)showSearchPluginDetected:(BOOL)pluginsAreDetected;
+- (void)showBlockedPopups:(nsIArray*)blockedSites whitelistingSource:(BOOL)shouldWhitelist;
+- (void)blacklistPopupsFromURL:(NSString*)inURL;
+
+- (void)runAwayFromCertificateErrorSite;
+- (void)addCertificateOverrideForSite:(NSString*)url;
+
+- (BOOL)userChangedLocationField;
+
+- (void)contentViewChangedTo:(NSView*)inView forURL:(NSString*)inURL;
+
+// Called when the user clicks buttons on the about:safebrowsingblocked error page.
+- (void)showSafeBrowsingInformation;
+- (void)showMalwareDiagnosticInformation;
+- (void)reportIncorrectlyBlockedSite:(NSString*)aBlockedURL
+                              reason:(ESafeBrowsingBlockedReason)aBlockedReason;
+
+// Returns YES if the given event should be sent to the main menu first, then
+// only sent on to the content view if unhandled.
+- (BOOL)shouldDivertKeyEquivalentToMenu:(NSEvent*)event;
+
+// Called when there is a swipe gesture with the given direction.
+- (void)swipeGestureDetectedWithDirection:(CHSwipeGestureDirection)swipeDirection;
+
+// Called when a zoom gesture starts.
+- (void)zoomGestureStarted;
+// Called repeatedly over the course of a zoom gesture, with the delta since the
+// last update.
+- (void)zoomGestureContinuedWithDelta:(float)delta;
+
+@end
+
+//
+// The BrowserWrapper requests UI to be created via this delegate. Unlike the
+// |BrowserUIDelegate|, this delegate is always present even when in a 
+// background tab.
+//
+@protocol BrowserUICreationDelegate
+
+// create a new tab in the window associated with this wrapper and get it's
+// browser view without loading anything into it. why is the name so funny? BWC
+// already has openNewTab: and createNewTab: methods...
+- (CHBrowserView*)createNewTabBrowser:(BOOL)inLoadInBg;
+
+@end
+
+
+// 
+// ContentViewProvider
+// 
+// This is used to allow clients (the browser window controller) to cause certain
+// URLs to replace the browser view witih a custom view (like bookmarks).
+// 
+@protocol ContentViewProvider
+
+// supply a view for the given url, or return nil to ignore this request
+- (NSView*)provideContentViewForURL:(NSString*)inURL;
+// notification that the given view from this provider has been inserted
+// for the given url
+- (void)contentView:(NSView*)inView usedForURL:(NSString*)inURL;
+// So the content view can be integrated into an existing key view loop,
+// return the last key view inside of it.
+- (NSView*)lastKeySubview;
+
+@end
+
+
+// 
+// BrowserWrapper
+// 
+// This is a container view for the browser content area that can be
+// nested inside of tab view items. It's mostly agnostic about its
+// container, communicating with it via a BrowserUIDelegate delegate
+// (although some of the code assumes that the [window delegate] implements
+// particular methods).
+// 
+// ContentViewProviders can be registered, and they can replace the content
+// view with one of their own (this is used for bookmarks).
+// 
+
+@interface BrowserWrapper : NSView <CHBrowserListener, CHBrowserContainer>
+{
+  NSWindow*                 mWindow;           // the window we are or will be in (never nil)
+  
+  // XXX the BrowserWrapper really shouldn't know anything about the tab that it's in
+  NSTabViewItem*            mTabItem;
+
+  NSImage*                  mSiteIconImage;    // current proxy icon image, which may be a site icon (favicon).
+  NSString*                 mSiteIconURI;      // uri from  which we loaded the site icon	
+
+  NSString*                 mPendingURI;       // strong
+  
+    // the secure state of this browser. We need to hold it so that we can set
+    // the global lock icon whenever we become the primary. Value is one of
+    // security enums in nsIWebProgressListener.
+  unsigned long             mSecureState;
+    // the display title for this page (which may be different than the page title)
+  NSString*                 mDisplayTitle;
+    // array of popupevents that have been blocked. We can use them to reconstruct the popups
+    // later. If nil, no sites are blocked. Cleared after each new page.
+  nsIMutableArray*          mBlockedPopups;
+  NSMutableArray*           mFeedList;         // list of feeds found on page
+  NSMutableArray*           mDetectedSearchPlugins; // STRONG;
+
+  CHBrowserView*            mBrowserView;      // retained
+  ToolTip*                  mToolTip;
+  FormFillController*       mFormFillController;  // strong
+  NSMutableArray*           mStatusStrings;    // current status bar messages, STRONG
+  NSMutableSet*             mLoadingResources; // page resources currently loading, STRONG
+
+  IBOutlet TransientBar*    mBlockedPopupBar;   // loaded on demand, can be nil, STRONG
+  IBOutlet RolloverImageButton* mBlockedPopupCloseButton;
+  IBOutlet NSTextField*     mBlockedPopupLabel;
+
+  FindBarController*        mFindBarController;  // STRONG
+
+  double                    mProgress;
+  
+  id<BrowserUIDelegate>         mDelegate;         // not retained, NULL if in bg
+  id<BrowserUICreationDelegate> mCreateDelegate;   // not retained, always present
+  
+  NSMutableDictionary*      mContentViewProviders;   // ContentViewProviders keyed by the url that shows them
+  
+  BOOL mIsBusy;
+  BOOL mListenersAttached; // We hook up our click and context menu listeners lazily.
+                           // If we never become the primary view, we don't bother creating the listeners.
+  BOOL mActivateOnLoad;    // If set, activate the browser view when loading starts.
+
+  TransientBar*             mTopTransientBar;    // strong
+  TransientBar*             mBottomTransientBar; // strong
+
+  IBOutlet SafeBrowsingBar* mSafeBrowsingBar; // loaded on demand, can be nil, strong
+  IBOutlet NSTextField*     mSafeBrowsingBarLabel;
+  NSMutableDictionary*      mIgnoredBlockedSites; // strong
+
+  BOOL                      mPendingActivation;
+
+  KeychainBrowserListener*  mPasswordAutofillListener;  // strong
+}
+
+- (id)initWithTab:(NSTabViewItem*)aTab inWindow:(NSWindow*)window;
+- (id)initWithFrame:(NSRect)frameRect inWindow:(NSWindow*)window;
+
+// only the BrowserWrapper in the frontmost tab has a non-null delegate
+- (void)setDelegate:(id<BrowserUIDelegate>)delegate;
+- (id<BrowserUIDelegate>)delegate;
+// all BrowserWrappers have one of these, even if in the bg.
+- (void)setUICreationDelegate:(id<BrowserUICreationDelegate>)delegate;
+
+- (BOOL)browserShouldClose;
+- (void)browserClosed;
+
+- (void)setFrame:(NSRect)frameRect resizingBrowserViewIfHidden:(BOOL)inResizeBrowser;
+
+- (void)setBrowserActive:(BOOL)inActive;
+
+
+// accessors
+- (CHBrowserView*)browserView;
+- (BOOL)isBusy;
+// Returns YES if a blank page is showing.
+- (BOOL)isEmpty;
+- (BOOL)isInternalURI;
+// Returns YES if a phishing or malware error overlay is showing.
+- (BOOL)isBlockedErrorOverlayShowing;
+// Returns YES if a network or certificate error overlay is showing.
+- (BOOL)isPageLoadErrorOverlayShowing;
+- (BOOL)isBookmarkable;
+- (BOOL)canReload;
+
+- (NSString*)pendingURI;
+- (NSString*)currentURI;
+- (NSString*)documentURI;
+- (NSString*)pageTitle;
+- (NSString*)pageSource;
+- (NSString*)pageText;
+- (NSString*)selectionSource;
+- (NSString*)selectionText;
+- (NSImage*)siteIcon;
+- (NSString*)statusString;
+- (float)loadingProgress;
+- (BOOL)popupsBlocked;
+- (BOOL)feedsDetected;
+- (unsigned long)securityState;
+- (NSArray*)feedList;
+- (NSArray*)detectedSearchPlugins;
+
+- (IBAction)showPopups:(id)sender;
+- (IBAction)unblockPopups:(id)sender;
+- (IBAction)blacklistPopups:(id)sender;
+- (IBAction)hideBlockedPopupView:(id)sender;
+
+- (void)loadURI:(NSString *)urlSpec referrer:(NSString*)referrer flags:(unsigned int)flags focusContent:(BOOL)focusContent allowPopups:(BOOL)inAllowPopups;
+
+- (void)didBecomeActiveBrowser;
+- (void)willResignActiveBrowser;
+
+- (void)setTab:(NSTabViewItem*)tab;
+- (NSTabViewItem*) tab;
+
+- (void)reload:(unsigned int)reloadFlags;
+- (IBAction)reloadWithNewCharset:(NSString*)charset;
+- (NSString*)currentCharset;
+
+- (NSWindow*)nativeWindow;
+- (NSMenu*)contextMenu;
+
+- (void)showFindBar;
+
+- (void)setNextKeyViewFollowingBrowserContent:(NSView *)aNextKeyView;
+
+// Actions from the safe browsing bar:
+- (IBAction)closeSafeBrowsingBar:(id)sender;
+- (IBAction)reportIncorrectlyBlockedSite:(id)sender;
+- (IBAction)runAwayFromBlockedSite:(id)sender;
+
+// Returns NO if an existing bar in the same position did not allow replacement.
+- (BOOL)showTransientBar:(TransientBar*)aTransientBar atPosition:(ETransientBarPosition)aPosition;
+- (void)removeTransientBar:(TransientBar*)aTransientBar display:(BOOL)aShouldDisplay;
+
+// Custom view embedding
+- (void)registerContentViewProvider:(id<ContentViewProvider>)inProvider forURL:(NSString*)inURL;
+- (void)unregisterContentViewProviderForURL:(NSString*)inURL;
+- (id)contentViewProviderForURL:(NSString*)inURL;
+
+// CHBrowserListener messages
+- (void)onLoadingStarted;
+- (void)onLoadingCompleted:(BOOL)succeeded;
+- (void)onResourceLoadingStarted:(NSValue*)resourceIdentifier;
+- (void)onResourceLoadingCompleted:(NSValue*)resourceIdentifier;
+- (void)onProgressChange64:(long long)currentBytes outOf:(long long)maxBytes;
+- (void)onProgressChange:(long)currentBytes outOf:(long)maxBytes;
+- (void)onLocationChange:(NSString*)urlSpec isNewPage:(BOOL)newPage requestStatus:(ERequestStatus)requestStatus;
+- (void)onStatusChange:(NSString*)aMessage;
+- (void)onSecurityStateChange:(unsigned long)newState;
+- (void)onShowTooltip:(NSPoint)where withText:(NSString*)text;
+- (void)onHideTooltip;
+- (void)onFlashblockCheck:(nsIDOMEvent*)inEvent;
+- (void)onSilverblockCheck:(nsIDOMEvent*)inEvent;
+- (void)onFeedDetected:(NSString*)inFeedURI feedTitle:(NSString*)inFeedTitle;
+
+// CHBrowserContainer messages
+- (void)setStatus:(NSString *)statusString ofType:(NSStatusType)type;
+- (NSString *)title;
+- (void)setTitle:(NSString *)title;
+- (void)sizeBrowserTo:(NSSize)dimensions;
+- (CHBrowserView*)createBrowserWindow:(unsigned int)mask;
+- (void)sendBrowserWindowToBack;
+
+@end
+
+
+//
+// PopupBlockedBar
+//
+// A TransientBar subclass displayed when pop-up windows are blocked.
+//
+@interface PopupBlockedBar : TransientBar
+{
+  IBOutlet NSTextField *mPopupBlockedMessageTextField;
+  float mVerticalPadding;
+  float mMessageTextRightStrutLength;
+}
+- (void)verticallyCenterAllSubviews;
+
+@end

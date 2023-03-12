@@ -1,0 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+"Alert" = "Alert";
+"Confirm" = "Confirm";
+"ConfirmCheck" = "Confirm";
+"Prompt" = "Prompt";
+"PromptUsernameAndPassword2" = "Authentication Required";
+"PromptPassword2" = "Password Required";
+"Select" = "Select";
+"OK" = "OK";
+"Cancel" = "Cancel";
+"Yes" = "&Yes";
+"No" = "&No";
+"Save" = "&Save";
+"Revert" = "&Revert";
+"DontSave" = "&Don’t Save";
+"ScriptDlgGenericHeading" = "[JavaScript Application]";
+"ScriptDlgHeading" = "The page at %S says:";

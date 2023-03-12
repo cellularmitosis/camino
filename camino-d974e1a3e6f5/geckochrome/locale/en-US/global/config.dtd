@@ -1,0 +1,48 @@
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+
+<!ENTITY window.title "about:config">
+
+<!-- about:config warning page -->
+<!ENTITY aboutWarningTitle.label "Be careful!">
+<!ENTITY aboutWarningText.label "This configuration page contains settings that keep Camino working properly.  Modifying these settings may cause problems such as instability, data loss, broken features, or even security vulnerabilities.">
+<!ENTITY aboutWarningButton.label "I understand and wish to continue">
+<!ENTITY aboutWarningCheckbox.label "Show this warning next time">
+
+<!ENTITY filterPrefs.label "Filter:">
+<!ENTITY filterPrefs.accesskey "F">
+<!ENTITY focusFilter.key "f">
+
+<!--Columns-->
+<!ENTITY prefColumn.label "Preference Name">
+<!ENTITY lockColumn.label "Status">
+<!ENTITY typeColumn.label "Type">
+<!ENTITY valueColumn.label "Value">
+
+<!--Tooltips-->
+<!ENTITY prefColumnHeader.tooltip "Click to sort"> 
+<!ENTITY columnChooser.tooltip "Click to select columns to display"> 
+
+<!--Context Menu-->
+<!ENTITY copyPref.key "C">
+<!ENTITY copyPref.label "Copy">
+<!ENTITY copyPref.accesskey "C">
+<!ENTITY copyName.label "Copy Name">
+<!ENTITY copyName.accesskey "N">
+<!ENTITY copyValue.label "Copy Value">
+<!ENTITY copyValue.accesskey "V">
+<!ENTITY modify.label "Modify">
+<!ENTITY modify.accesskey "M">
+<!ENTITY toggle.label "Toggle">
+<!ENTITY toggle.accesskey "T">
+<!ENTITY reset.label "Reset">
+<!ENTITY reset.accesskey "R">
+<!ENTITY new.label "New">
+<!ENTITY new.accesskey "w">
+<!ENTITY string.label "String">
+<!ENTITY string.accesskey "S">
+<!ENTITY integer.label "Integer">
+<!ENTITY integer.accesskey "I">
+<!ENTITY boolean.label "Boolean">
+<!ENTITY boolean.accesskey "B">
